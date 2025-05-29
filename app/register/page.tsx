@@ -25,12 +25,54 @@ export default function RegisterPage() {
     setFormData(prev => ({ ...prev, [field]: file }))
   }
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  const validatePassword = (password: string) => {
+    const hasUpperCase = /[A-Z]/.test(password)
+    const hasLowerCase = /[a-z]/.test(password)
+    const hasNumbers = /\d/.test(password)
+    const hasMinLength = password.length >= 8
+
+    return {
+      hasUpperCase,
+      hasLowerCase,
+      hasNumbers,
+      hasMinLength,
+      isValid: hasUpperCase && hasLowerCase && hasNumbers && hasMinLength
+    }
+  }
+
+  const validateFile = (file: File | null, maxSize: number = 10 * 1024 * 1024) => {
+    if (!file) return { isValid: false, error: "" }
+
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']
+    const isValidType = allowedTypes.includes(file.type)
+    const isValidSize = file.size <= maxSize
+
+    if (!isValidType) {
+      return { isValid: false, error: "Formato no válido. Solo se permiten PDF, JPG y PNG" }
+    }
+    if (!isValidSize) {
+      return { isValid: false, error: `El archivo debe ser menor a ${maxSize / (1024 * 1024)}MB` }
+    }
+
+    return { isValid: true, error: "" }
+  }
+
+  const passwordValidation = validatePassword(formData.password)
+  const emailValidation = validateEmail(formData.email)
+  const documentValidation = validateFile(formData.identityDocument)
+  const profilePhotoValidation = validateFile(formData.profilePhoto, 5 * 1024 * 1024) // 5MB for photos
+
   const isFormValid = () => {
     return formData.fullName.length >= 2 &&
-           formData.email.includes('@') &&
-           formData.password.length >= 8 &&
+           emailValidation &&
+           passwordValidation.isValid &&
            formData.password === formData.confirmPassword &&
-           formData.identityDocument !== null
+           documentValidation.isValid
   }
 
   return (
@@ -92,6 +134,9 @@ export default function RegisterPage() {
                 />
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-500" />
               </div>
+              {formData.email.length > 0 && !emailValidation && (
+                <p className="text-sm text-red-500">Ingresa un correo electrónico válido</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -102,7 +147,7 @@ export default function RegisterPage() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Mínimo 8 caracteres"
+                  placeholder="Mínimo 8 caracteres, mayúsculas, minúsculas y números"
                   className="pl-10 border-green-200 rounded-xl"
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
@@ -110,8 +155,21 @@ export default function RegisterPage() {
                 />
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-500" />
               </div>
-              {formData.password.length > 0 && formData.password.length < 8 && (
-                <p className="text-sm text-red-500">La contraseña debe tener al menos 8 caracteres</p>
+              {formData.password.length > 0 && !passwordValidation.isValid && (
+                <div className="text-sm space-y-1">
+                  <p className={`${passwordValidation.hasMinLength ? 'text-green-600' : 'text-red-500'}`}>
+                    ✓ Mínimo 8 caracteres
+                  </p>
+                  <p className={`${passwordValidation.hasUpperCase ? 'text-green-600' : 'text-red-500'}`}>
+                    ✓ Al menos una mayúscula
+                  </p>
+                  <p className={`${passwordValidation.hasLowerCase ? 'text-green-600' : 'text-red-500'}`}>
+                    ✓ Al menos una minúscula
+                  </p>
+                  <p className={`${passwordValidation.hasNumbers ? 'text-green-600' : 'text-red-500'}`}>
+                    ✓ Al menos un número
+                  </p>
+                </div>
               )}
             </div>
 
@@ -157,6 +215,12 @@ export default function RegisterPage() {
                 className="hidden"
                 onChange={(e) => handleFileChange('identityDocument', e.target.files?.[0] || null)}
               />
+              {formData.identityDocument && !documentValidation.isValid && (
+                <p className="text-sm text-red-500">{documentValidation.error}</p>
+              )}
+              {formData.identityDocument && documentValidation.isValid && (
+                <p className="text-sm text-green-600">✓ Documento válido</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -180,13 +244,19 @@ export default function RegisterPage() {
                 className="hidden"
                 onChange={(e) => handleFileChange('profilePhoto', e.target.files?.[0] || null)}
               />
+              {formData.profilePhoto && !profilePhotoValidation.isValid && (
+                <p className="text-sm text-red-500">{profilePhotoValidation.error}</p>
+              )}
+              {formData.profilePhoto && profilePhotoValidation.isValid && (
+                <p className="text-sm text-green-600">✓ Foto válida</p>
+              )}
             </div>
 
             <Link href="/register/personal" className="block">
-              <Button 
+              <Button
                 className={`w-full rounded-full py-6 mt-8 ${
-                  isFormValid() 
-                    ? 'bg-green-500 hover:bg-green-600' 
+                  isFormValid()
+                    ? 'bg-green-500 hover:bg-green-600'
                     : 'bg-gray-300 cursor-not-allowed'
                 }`}
                 disabled={!isFormValid()}
