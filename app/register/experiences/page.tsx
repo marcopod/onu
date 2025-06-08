@@ -18,7 +18,8 @@ export default function ExperiencesPage() {
       date: "",
       description: "",
       reportedToAuthorities: false,
-      evidence: [] as File[]
+      evidence: [] as File[],
+      evidenceErrors: [] as string[]
     }
   ])
 
@@ -29,7 +30,8 @@ export default function ExperiencesPage() {
       date: "",
       description: "",
       reportedToAuthorities: false,
-      evidence: []
+      evidence: [],
+      evidenceErrors: []
     }])
   }
 
@@ -40,22 +42,55 @@ export default function ExperiencesPage() {
   }
 
   const updateExperience = (index: number, field: string, value: any) => {
-    setExperiences(prev => prev.map((exp, i) => 
+    setExperiences(prev => prev.map((exp, i) =>
       i === index ? { ...exp, [field]: value } : exp
     ))
+  }
+
+  const validateEvidenceFiles = (files: File[]) => {
+    const maxTotalSize = 20 * 1024 * 1024 // 20MB
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+
+    let totalSize = 0
+    const errors: string[] = []
+
+    for (const file of files) {
+      totalSize += file.size
+
+      if (!allowedTypes.includes(file.type)) {
+        errors.push(`${file.name}: Formato no válido. Solo se permiten JPG, PNG, PDF y DOCX`)
+      }
+    }
+
+    if (totalSize > maxTotalSize) {
+      errors.push(`El tamaño total de archivos excede los 20MB (actual: ${(totalSize / 1024 / 1024).toFixed(2)}MB)`)
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      totalSize
+    }
   }
 
   const handleFileUpload = (index: number, files: FileList | null) => {
     if (files) {
       const fileArray = Array.from(files)
-      updateExperience(index, 'evidence', fileArray)
+      const validation = validateEvidenceFiles(fileArray)
+
+      if (validation.isValid) {
+        updateExperience(index, 'evidence', fileArray)
+        updateExperience(index, 'evidenceErrors', [])
+      } else {
+        updateExperience(index, 'evidenceErrors', validation.errors)
+      }
     }
   }
 
   const hasValidExperience = () => {
-    return experiences.some(exp => 
-      exp.category !== "" && 
-      exp.date !== "" && 
+    return experiences.some(exp =>
+      exp.category !== "" &&
+      exp.date !== "" &&
       exp.description.length >= 100
     )
   }
@@ -132,8 +167,8 @@ export default function ExperiencesPage() {
                     <Label className="text-green-800 font-medium">
                       Categoría / Tipo de acoso *
                     </Label>
-                    <Select 
-                      value={experience.category} 
+                    <Select
+                      value={experience.category}
                       onValueChange={(value) => updateExperience(index, 'category', value)}
                     >
                       <SelectTrigger className="border-green-200 rounded-xl">
@@ -200,7 +235,7 @@ export default function ExperiencesPage() {
                   </div>
 
                   <div className="flex items-center space-x-2">
-                    <Checkbox 
+                    <Checkbox
                       id={`reported-${index}`}
                       checked={experience.reportedToAuthorities}
                       onCheckedChange={(checked) => updateExperience(index, 'reportedToAuthorities', checked)}
@@ -223,7 +258,7 @@ export default function ExperiencesPage() {
                     >
                       <Upload className="h-5 w-5 text-green-500" />
                       <span className="text-sm text-gray-500">
-                        {experience.evidence.length > 0 
+                        {experience.evidence.length > 0
                           ? `${experience.evidence.length} archivo(s) seleccionado(s)`
                           : "Subir evidencia"
                         }
@@ -237,13 +272,23 @@ export default function ExperiencesPage() {
                       className="hidden"
                       onChange={(e) => handleFileUpload(index, e.target.files)}
                     />
-                    
+
                     {experience.evidence.length > 0 && (
                       <div className="space-y-1">
                         {experience.evidence.map((file, fileIndex) => (
                           <div key={fileIndex} className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
                             {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
                           </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {experience.evidenceErrors && experience.evidenceErrors.length > 0 && (
+                      <div className="space-y-1">
+                        {experience.evidenceErrors.map((error, errorIndex) => (
+                          <p key={errorIndex} className="text-sm text-red-500">
+                            {error}
+                          </p>
                         ))}
                       </div>
                     )}
@@ -270,7 +315,7 @@ export default function ExperiencesPage() {
               </p>
             </div>
 
-            <Link href="/" className="block">
+            <Link href="/register/complete" className="block">
               <Button className="w-full bg-green-500 hover:bg-green-600 rounded-full py-6 mt-8">
                 Completar Registro
               </Button>

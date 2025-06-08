@@ -1,10 +1,68 @@
+"use client"
+
 import Link from "next/link"
+import { useState, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Mail, Phone, Facebook, Twitter } from "lucide-react"
+import { ArrowLeft, Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { useAuth } from "@/components/auth/auth-context"
+import { toast } from "sonner"
 
-export default function LoginPage() {
+function LoginForm() {
+  const [formData, setFormData] = useState({
+    email: "",
+    password: ""
+  })
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const { login } = useAuth()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirect') || '/'
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  const isFormValid = () => {
+    return formData.email.trim() !== "" &&
+           formData.password.trim() !== "" &&
+           validateEmail(formData.email)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!isFormValid()) {
+      toast.error("Por favor, completa todos los campos correctamente")
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      await login({
+        email: formData.email,
+        password: formData.password
+      })
+
+      toast.success("¡Inicio de sesión exitoso!")
+      router.push(redirectTo)
+    } catch (error: any) {
+      toast.error(error.message || "Error al iniciar sesión")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <main className="flex-1 flex flex-col p-6 max-w-md mx-auto w-full">
@@ -13,64 +71,67 @@ export default function LoginPage() {
             <Link href="/" className="text-green-800">
               <ArrowLeft className="h-6 w-6" />
             </Link>
-            <h1 className="text-2xl font-bold text-green-800 ml-4">Login / Register</h1>
+            <h1 className="text-2xl font-bold text-green-800 ml-4">Iniciar Sesión</h1>
           </div>
 
-          <form className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-green-800 font-medium">
-                Email
+                Correo Electrónico *
               </Label>
               <div className="relative">
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder="Ingresa tu correo electrónico"
                   className="pl-10 border-green-200 rounded-xl"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  required
                 />
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-500" />
               </div>
+              {formData.email && !validateEmail(formData.email) && (
+                <p className="text-sm text-red-500">Formato de correo inválido</p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone" className="text-green-800 font-medium">
-                Phone Number
+              <Label htmlFor="password" className="text-green-800 font-medium">
+                Contraseña *
               </Label>
               <div className="relative">
                 <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="Enter your phone number"
-                  className="pl-10 border-green-200 rounded-xl"
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Ingresa tu contraseña"
+                  className="pl-10 pr-10 border-green-200 rounded-xl"
+                  value={formData.password}
+                  onChange={(e) => handleInputChange('password', e.target.value)}
+                  required
                 />
-                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-500" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-500" />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
             </div>
 
-            <div className="relative flex items-center py-4">
-              <div className="flex-grow border-t border-gray-300"></div>
-              <span className="flex-shrink mx-4 text-gray-400">or continue with</span>
-              <div className="flex-grow border-t border-gray-300"></div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Button
-                variant="outline"
-                className="border-green-200 rounded-xl py-6 flex items-center justify-center gap-2"
-              >
-                <Facebook className="h-5 w-5 text-blue-600" />
-                <span>Facebook</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="border-green-200 rounded-xl py-6 flex items-center justify-center gap-2"
-              >
-                <Twitter className="h-5 w-5 text-blue-400" />
-                <span>Twitter</span>
-              </Button>
-            </div>
-
-            <Button className="w-full bg-green-500 hover:bg-green-600 rounded-full py-6 mt-8">Continuar</Button>
+            <Button
+              type="submit"
+              className={`w-full rounded-full py-6 mt-8 ${
+                isFormValid() && !isLoading
+                  ? 'bg-green-500 hover:bg-green-600'
+                  : 'bg-gray-300 cursor-not-allowed'
+              }`}
+              disabled={!isFormValid() || isLoading}
+            >
+              {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
+            </Button>
           </form>
 
           <div className="mt-6 text-center">
@@ -84,5 +145,17 @@ export default function LoginPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-500"></div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }
