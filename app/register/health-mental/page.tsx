@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,45 +10,78 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ArrowLeft, Plus, X } from "lucide-react"
+import { PersistentRegistrationProvider, usePersistentCurrentStepData, usePersistentUpdateStepData } from "@/components/auth/persistent-registration-context"
+import { RegistrationStep4Data } from "@/lib/types"
 
-export default function HealthMentalPage() {
+function HealthMentalPageContent() {
+  const stepData = usePersistentCurrentStepData<RegistrationStep4Data>('step4')
+  const updateStepData = usePersistentUpdateStepData()
+  const router = useRouter()
+
   const [formData, setFormData] = useState({
-    psychiatricConditions: "",
-    hasAnxietyAttacks: false,
-    anxietyFrequency: "",
-    psychiatricMedications: [
+    psychiatricConditions: stepData?.psychiatricConditions || "",
+    hasAnxietyAttacks: stepData?.hasAnxietyAttacks || false,
+    anxietyFrequency: stepData?.anxietyFrequency || "",
+    psychiatricMedications: stepData?.psychiatricMedications || [
       { name: "", dose: "", frequency: "" }
     ],
-    familyHistory: ""
+    familyHistory: stepData?.familyHistory || ""
   })
 
+  // Update form data when step data changes
+  useEffect(() => {
+    if (stepData) {
+      setFormData({
+        psychiatricConditions: stepData.psychiatricConditions || "",
+        hasAnxietyAttacks: stepData.hasAnxietyAttacks || false,
+        anxietyFrequency: stepData.anxietyFrequency || "",
+        psychiatricMedications: stepData.psychiatricMedications || [
+          { name: "", dose: "", frequency: "" }
+        ],
+        familyHistory: stepData.familyHistory || ""
+      })
+    }
+  }, [stepData])
+
   const handleInputChange = (field: string, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    const newFormData = { ...formData, [field]: value }
+    setFormData(newFormData)
+    updateStepData('step4', newFormData)
+    console.log('Updated step4 data:', newFormData)
   }
 
   const addMedication = () => {
-    setFormData(prev => ({
-      ...prev,
-      psychiatricMedications: [...prev.psychiatricMedications, { name: "", dose: "", frequency: "" }]
-    }))
+    const newFormData = {
+      ...formData,
+      psychiatricMedications: [...formData.psychiatricMedications, { name: "", dose: "", frequency: "" }]
+    }
+    setFormData(newFormData)
+    updateStepData('step4', newFormData)
+    console.log('Added psychiatric medication, updated step4 data:', newFormData)
   }
 
   const removeMedication = (index: number) => {
     if (formData.psychiatricMedications.length > 1) {
-      setFormData(prev => ({
-        ...prev,
-        psychiatricMedications: prev.psychiatricMedications.filter((_, i) => i !== index)
-      }))
+      const newFormData = {
+        ...formData,
+        psychiatricMedications: formData.psychiatricMedications.filter((_, i) => i !== index)
+      }
+      setFormData(newFormData)
+      updateStepData('step4', newFormData)
+      console.log('Removed psychiatric medication, updated step4 data:', newFormData)
     }
   }
 
   const updateMedication = (index: number, field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      psychiatricMedications: prev.psychiatricMedications.map((med, i) => 
+    const newFormData = {
+      ...formData,
+      psychiatricMedications: formData.psychiatricMedications.map((med, i) =>
         i === index ? { ...med, [field]: value } : med
       )
-    }))
+    }
+    setFormData(newFormData)
+    updateStepData('step4', newFormData)
+    console.log('Updated psychiatric medication, updated step4 data:', newFormData)
   }
 
   return (
@@ -63,11 +97,11 @@ export default function HealthMentalPage() {
 
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-green-600 font-medium">Paso 4 de 5</span>
+              <span className="text-sm text-green-600 font-medium">Paso 4 de 4</span>
               <span className="text-sm text-gray-500">Información psicológica</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-green-500 h-2 rounded-full w-4/5"></div>
+              <div className="bg-green-500 h-2 rounded-full w-full"></div>
             </div>
           </div>
 
@@ -224,14 +258,33 @@ export default function HealthMentalPage() {
               </ul>
             </div>
 
-            <Link href="/register/experiences" className="block">
-              <Button className="w-full bg-green-500 hover:bg-green-600 rounded-full py-6 mt-8">
-                Continuar
-              </Button>
-            </Link>
+            <Button
+              className="w-full bg-green-500 hover:bg-green-600 rounded-full py-6 mt-8"
+              onClick={() => {
+                // Save final step data and redirect to complete registration
+                console.log('Saving final step4 data and completing registration:', formData);
+                updateStepData('step4', formData);
+
+                // Add empty step5 data for compatibility with registration API
+                updateStepData('step5', { experiences: [] });
+
+                // Redirect to registration complete page
+                router.push('/register/complete');
+              }}
+            >
+              Completar Registro
+            </Button>
           </form>
         </div>
       </main>
     </div>
+  )
+}
+
+export default function HealthMentalPage() {
+  return (
+    <PersistentRegistrationProvider>
+      <HealthMentalPageContent />
+    </PersistentRegistrationProvider>
   )
 }

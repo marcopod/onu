@@ -1,22 +1,28 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
-// Try to use real database, fall back to mock if not available
+
+// Load environment variables if not in Next.js runtime
+if (typeof window === 'undefined' && !process.env.NEXT_RUNTIME) {
+  require('dotenv').config({ path: '.env.local' });
+}
+// Force use of real database for registration data
 let dbModule;
 try {
   // Check if we have database environment variables
-  if (process.env.POSTGRES_URL && process.env.POSTGRES_URL.includes('localhost')) {
-    // Use mock for localhost development
-    dbModule = require('./mock-db');
-  } else if (process.env.POSTGRES_URL) {
-    // Use real database
+  const hasPostgresUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+
+  if (hasPostgresUrl) {
+    // Always use real database when URL is available
+    console.log('Using real PostgreSQL database for auth operations');
     dbModule = require('./db');
   } else {
     // No database configured, use mock
+    console.log('No database URL configured, using mock database');
     dbModule = require('./mock-db');
   }
 } catch (error) {
-  console.log('Database not available, using mock database for development');
+  console.log('Database connection failed, using mock database for development:', error.message);
   dbModule = require('./mock-db');
 }
 

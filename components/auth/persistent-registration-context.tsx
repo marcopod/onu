@@ -65,7 +65,7 @@ export function PersistentRegistrationProvider({ children }: { children: React.R
   const [currentStep, setCurrentStep] = useState(1);
   const [data, setData] = useState<Partial<CompleteRegistrationData>>(initialData);
   const [isLoaded, setIsLoaded] = useState(false);
-  const totalSteps = 5;
+  const totalSteps = 4;
 
   // Load data from localStorage on mount
   useEffect(() => {

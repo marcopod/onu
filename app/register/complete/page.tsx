@@ -12,13 +12,19 @@ import { toast } from "sonner"
 function RegistrationCompleteContent() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCompleted, setIsCompleted] = useState(false)
+  const [hasAttemptedSubmission, setHasAttemptedSubmission] = useState(false)
   const { register } = useAuth()
   const { data, resetRegistration } = usePersistentRegistration()
   const router = useRouter()
 
   const handleRegistrationSubmit = async () => {
-    if (isSubmitting || isCompleted) return
+    if (isSubmitting || isCompleted || hasAttemptedSubmission) {
+      console.log('Registration already in progress, completed, or attempted. Skipping...');
+      return;
+    }
 
+    console.log('Starting registration submission...');
+    setHasAttemptedSubmission(true);
     setIsSubmitting(true)
 
     try {
@@ -30,6 +36,23 @@ function RegistrationCompleteContent() {
       console.log('Step1 email:', data.step1?.email);
       console.log('Step1 password:', data.step1?.password ? '[PRESENT]' : '[MISSING]');
       console.log('Step1 confirmPassword:', data.step1?.confirmPassword ? '[PRESENT]' : '[MISSING]');
+
+      console.log('Step2 exists:', !!data.step2);
+      console.log('Step2 age:', data.step2?.age);
+      console.log('Step2 gender:', data.step2?.gender);
+      console.log('Step2 emergency contacts:', data.step2?.emergencyContacts?.length || 0);
+
+      console.log('Step3 exists:', !!data.step3);
+      console.log('Step3 weight:', data.step3?.weight);
+      console.log('Step3 height:', data.step3?.height);
+      console.log('Step3 medications:', data.step3?.currentMedications?.length || 0);
+
+      console.log('Step4 exists:', !!data.step4);
+      console.log('Step4 psychiatric conditions:', data.step4?.psychiatricConditions);
+      console.log('Step4 psychiatric medications:', data.step4?.psychiatricMedications?.length || 0);
+
+      console.log('Step5 exists:', !!data.step5);
+      console.log('Step5 experiences:', data.step5?.experiences?.length || 0);
       console.log('================================');
 
       // Validate that we have the required data
@@ -43,12 +66,35 @@ function RegistrationCompleteContent() {
         return
       }
 
+      // Additional validation for data completeness
+      const hasStep2Data = data.step2?.age || data.step2?.gender || data.step2?.emergencyContacts?.some(c => c.name);
+      const hasStep3Data = data.step3?.weight || data.step3?.height || data.step3?.bloodType;
+      const hasStep4Data = data.step4?.psychiatricConditions || data.step4?.familyHistory;
+      const hasStep5Data = data.step5?.experiences?.some(e => e.category && e.description);
+
+      console.log('Data completeness check:');
+      console.log('- Step 2 has data:', hasStep2Data);
+      console.log('- Step 3 has data:', hasStep3Data);
+      console.log('- Step 4 has data:', hasStep4Data);
+      console.log('- Step 5 has data:', hasStep5Data);
+
+      if (!hasStep2Data) {
+        console.warn('⚠️ Step 2 data appears to be missing or incomplete');
+      }
+
+      console.log('Calling register function...');
       await register(data as any) // Type assertion since we validated required fields
+      console.log('Registration successful!');
       setIsCompleted(true)
-      toast.success("¡Registro completado exitosamente!")
+      toast.success("¡Registro completado exitosamente! Redirigiendo al inicio...")
 
       // Reset registration data
       resetRegistration()
+
+      // Redirect to home page after successful registration
+      setTimeout(() => {
+        router.push('/');
+      }, 2000); // 2 second delay to show success message
     } catch (error: any) {
       console.error('Registration error:', error)
       toast.error(error.message || "Error al completar el registro")
@@ -59,9 +105,18 @@ function RegistrationCompleteContent() {
   }
 
   useEffect(() => {
-    // Auto-submit registration when component mounts
-    handleRegistrationSubmit()
-  }, []) // Empty dependency array to run only once
+    // Auto-submit registration when component mounts, but only once
+    // Add a small delay to ensure all data is loaded from localStorage
+    if (!hasAttemptedSubmission && !isSubmitting && !isCompleted) {
+      console.log('Component mounted, waiting for data to load...');
+      const timer = setTimeout(() => {
+        console.log('Data should be loaded, attempting registration...');
+        handleRegistrationSubmit();
+      }, 500); // 500ms delay to ensure data is loaded
+
+      return () => clearTimeout(timer);
+    }
+  }, [hasAttemptedSubmission, isSubmitting, isCompleted]) // Dependencies to prevent multiple calls
 
   if (isSubmitting) {
     return (

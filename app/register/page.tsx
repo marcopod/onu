@@ -98,11 +98,11 @@ function RegisterPageContent() {
 
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-green-600 font-medium">Paso 1 de 5</span>
+              <span className="text-sm text-green-600 font-medium">Paso 1 de 4</span>
               <span className="text-sm text-gray-500">Información del perfil</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-green-500 h-2 rounded-full w-1/5"></div>
+              <div className="bg-green-500 h-2 rounded-full w-1/4"></div>
             </div>
           </div>
 

@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { registerUser, setAuthCookie } from '@/lib/auth';
-// Use the same database module as auth.ts
+import { moveTempFilesToUser, TempUploadResult } from '@/lib/file-upload';
+import { sql } from '@vercel/postgres';
+// Force use of real database for registration data
 let dbModule;
 try {
-  if (process.env.POSTGRES_URL && process.env.POSTGRES_URL.includes('localhost')) {
-    dbModule = require('@/lib/mock-db');
-  } else if (process.env.POSTGRES_URL) {
+  // Check if we have database environment variables
+  const hasPostgresUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+
+  if (hasPostgresUrl) {
+    // Always use real database when URL is available
+    console.log('Registration: Using real PostgreSQL database');
     dbModule = require('@/lib/db');
   } else {
+    // No database configured, use mock
+    console.log('Registration: No database URL configured, using mock database');
     dbModule = require('@/lib/mock-db');
   }
 } catch (error) {
-  console.log('Database not available, using mock database for development');
+  console.log('Registration: Database connection failed, using mock database for development:', error.message);
   dbModule = require('@/lib/mock-db');
 }
 
@@ -34,13 +41,38 @@ export async function POST(request: NextRequest) {
     const registrationData: CompleteRegistrationData = await request.json();
 
     // Debug: Log the received data
-    console.log('=== REGISTRATION DEBUG ===');
-    console.log('Received registration data:', JSON.stringify(registrationData, null, 2));
+    console.log('=== REGISTRATION API DEBUG ===');
+    console.log('Received registration data keys:', Object.keys(registrationData));
     console.log('Step1 data:', registrationData.step1);
     console.log('Step1 fullName:', registrationData.step1?.fullName);
     console.log('Step1 email:', registrationData.step1?.email);
     console.log('Step1 password:', registrationData.step1?.password ? '[PRESENT]' : '[MISSING]');
-    console.log('========================');
+
+    console.log('Step2 exists:', !!registrationData.step2);
+    if (registrationData.step2) {
+      console.log('Step2 age:', registrationData.step2.age);
+      console.log('Step2 gender:', registrationData.step2.gender);
+      console.log('Step2 emergency contacts count:', registrationData.step2.emergencyContacts?.length || 0);
+    }
+
+    console.log('Step3 exists:', !!registrationData.step3);
+    if (registrationData.step3) {
+      console.log('Step3 weight:', registrationData.step3.weight);
+      console.log('Step3 height:', registrationData.step3.height);
+      console.log('Step3 medications count:', registrationData.step3.currentMedications?.length || 0);
+    }
+
+    console.log('Step4 exists:', !!registrationData.step4);
+    if (registrationData.step4) {
+      console.log('Step4 psychiatric conditions:', registrationData.step4.psychiatricConditions);
+      console.log('Step4 psychiatric medications count:', registrationData.step4.psychiatricMedications?.length || 0);
+    }
+
+    console.log('Step5 exists:', !!registrationData.step5);
+    if (registrationData.step5) {
+      console.log('Step5 experiences count:', registrationData.step5.experiences?.length || 0);
+    }
+    console.log('===============================');
 
     // Validate required data
     if (!registrationData.step1) {
@@ -68,88 +100,272 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Register the user (this will validate email and password)
-    const user = await registerUser({
-      email: step1.email,
-      password: step1.password,
-      fullName: step1.fullName
-    });
+    // Check if user already exists first
+    let user;
+    try {
+      user = await registerUser({
+        email: step1.email,
+        password: step1.password,
+        fullName: step1.fullName
+      });
+      console.log('User registered successfully, processing files...');
+    } catch (error: any) {
+      // If user already exists, try to get the existing user
+      if (error.message && error.message.includes('duplicate key')) {
+        console.log('User already exists, checking if we can continue with profile data...');
 
-    // Create user profile if step2 data exists
+        // Get the existing user
+        const existingUserQuery = await sql`
+          SELECT id, email, full_name, created_at
+          FROM users
+          WHERE email = ${step1.email}
+        `;
+
+        if (existingUserQuery.rows.length > 0) {
+          user = {
+            id: existingUserQuery.rows[0].id,
+            email: existingUserQuery.rows[0].email,
+            fullName: existingUserQuery.rows[0].full_name,
+            createdAt: existingUserQuery.rows[0].created_at
+          };
+          console.log('Using existing user for profile data processing...');
+        } else {
+          throw error; // Re-throw if we can't find the user
+        }
+      } else {
+        throw error; // Re-throw if it's not a duplicate key error
+      }
+    }
+
+    // Process uploaded files if they exist
+    let profilePhotoUrl: string | undefined;
+    let identityDocumentUrl: string | undefined;
+
+    // Handle profile photo and identity document from step1
+    const tempFiles: TempUploadResult[] = [];
+
+    if (step1.profilePhoto && typeof step1.profilePhoto === 'object' && 'tempId' in step1.profilePhoto) {
+      tempFiles.push(step1.profilePhoto as TempUploadResult);
+    }
+
+    if (step1.identityDocument && typeof step1.identityDocument === 'object' && 'tempId' in step1.identityDocument) {
+      tempFiles.push(step1.identityDocument as TempUploadResult);
+    }
+
+    if (tempFiles.length > 0) {
+      console.log('Moving temp files to permanent location...');
+      const permanentFiles = await moveTempFilesToUser(tempFiles, user.id.toString());
+
+      // Map files to their purposes
+      for (let i = 0; i < tempFiles.length; i++) {
+        const tempFile = tempFiles[i];
+        const permanentFile = permanentFiles[i];
+
+        if (tempFile.uploadType === 'profile') {
+          profilePhotoUrl = permanentFile?.url;
+        } else if (tempFile.uploadType === 'identity') {
+          identityDocumentUrl = permanentFile?.url;
+        }
+      }
+    }
+
+    // Create or update user profile if step2 data exists and has meaningful data
     if (step2) {
-      await createUserProfile({
-        userId: user.id,
-        age: step2.age ? parseInt(step2.age) : undefined,
-        gender: step2.gender || undefined,
-        sexualOrientation: step2.sexualOrientation || undefined,
-        address: step2.address || undefined,
-        educationLevel: step2.educationLevel || undefined,
-        occupation: step2.occupation || undefined,
-        hobbies: step2.hobbies || undefined,
-        frequentPlaces: step2.frequentPlaces || undefined,
-        // Note: File uploads would need to be handled separately
-        identityDocumentUrl: undefined, // TODO: Implement file upload
-        profilePhotoUrl: undefined // TODO: Implement file upload
-      });
+      const hasStep2Data = step2.age || step2.gender || step2.address || step2.educationLevel ||
+                          step2.occupation || step2.hobbies || step2.frequentPlaces ||
+                          profilePhotoUrl || identityDocumentUrl;
 
-      // Create emergency contacts
+      if (hasStep2Data) {
+        console.log('Processing user profile with step2 data...');
+
+        // Check if profile already exists
+        const existingProfile = await sql`
+          SELECT id FROM user_profiles WHERE user_id = ${user.id}
+        `;
+
+        if (existingProfile.rows.length > 0) {
+          console.log('Updating existing user profile...');
+          await sql`
+            UPDATE user_profiles SET
+              age = ${step2.age ? parseInt(step2.age) : null},
+              gender = ${step2.gender || null},
+              sexual_orientation = ${step2.sexualOrientation || null},
+              address = ${step2.address || null},
+              education_level = ${step2.educationLevel || null},
+              occupation = ${step2.occupation || null},
+              hobbies = ${step2.hobbies || null},
+              frequent_places = ${step2.frequentPlaces || null},
+              identity_document_url = ${identityDocumentUrl || null},
+              profile_photo_url = ${profilePhotoUrl || null},
+              updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ${user.id}
+          `;
+        } else {
+          console.log('Creating new user profile...');
+          await createUserProfile({
+            userId: user.id,
+            age: step2.age ? parseInt(step2.age) : undefined,
+            gender: step2.gender || undefined,
+            sexualOrientation: step2.sexualOrientation || undefined,
+            address: step2.address || undefined,
+            educationLevel: step2.educationLevel || undefined,
+            occupation: step2.occupation || undefined,
+            hobbies: step2.hobbies || undefined,
+            frequentPlaces: step2.frequentPlaces || undefined,
+            identityDocumentUrl: identityDocumentUrl,
+            profilePhotoUrl: profilePhotoUrl
+          });
+        }
+        console.log('User profile processed successfully');
+      } else {
+        console.log('Skipping user profile processing - no meaningful data provided');
+      }
+
+      // Create or update emergency contacts only if they have valid data
       if (step2.emergencyContacts && step2.emergencyContacts.length > 0) {
-        await createEmergencyContacts(user.id, step2.emergencyContacts);
+        const validContacts = step2.emergencyContacts.filter(contact =>
+          contact.name?.trim() && contact.relationship?.trim() && contact.phone?.trim()
+        );
+
+        if (validContacts.length > 0) {
+          console.log(`Processing ${validContacts.length} emergency contacts...`);
+
+          // Delete existing contacts first (to avoid duplicates)
+          await sql`DELETE FROM emergency_contacts WHERE user_id = ${user.id}`;
+
+          // Create new contacts
+          await createEmergencyContacts(user.id, validContacts);
+          console.log('Emergency contacts processed successfully');
+        } else {
+          console.log('Skipping emergency contacts - no valid contacts provided');
+        }
       }
     }
 
-    // Create physical health data if step3 exists
+    // Create physical health data if step3 exists and has meaningful data
     if (step3) {
-      await createPhysicalHealth({
-        userId: user.id,
-        weight: step3.weight ? parseFloat(step3.weight) : undefined,
-        height: step3.height ? parseFloat(step3.height) : undefined,
-        bloodType: step3.bloodType || undefined,
-        hasDisability: step3.hasDisability || false,
-        disabilityDescription: step3.disabilityDescription || undefined,
-        chronicConditions: step3.chronicConditions || undefined,
-        medicalAllergies: step3.allergies?.medical || undefined,
-        foodAllergies: step3.allergies?.food || undefined,
-        environmentalAllergies: step3.allergies?.environmental || undefined
-      });
+      const hasStep3Data = step3.weight || step3.height || step3.bloodType ||
+                          step3.hasDisability || step3.disabilityDescription ||
+                          step3.chronicConditions || step3.allergies?.medical ||
+                          step3.allergies?.food || step3.allergies?.environmental;
 
-      // Create medications
+      if (hasStep3Data) {
+        console.log('Creating physical health record...');
+        await createPhysicalHealth({
+          userId: user.id,
+          weight: step3.weight ? parseFloat(step3.weight) : undefined,
+          height: step3.height ? parseFloat(step3.height) : undefined,
+          bloodType: step3.bloodType || undefined,
+          hasDisability: step3.hasDisability || false,
+          disabilityDescription: step3.disabilityDescription || undefined,
+          chronicConditions: step3.chronicConditions || undefined,
+          medicalAllergies: step3.allergies?.medical || undefined,
+          foodAllergies: step3.allergies?.food || undefined,
+          environmentalAllergies: step3.allergies?.environmental || undefined
+        });
+        console.log('Physical health record created successfully');
+      } else {
+        console.log('Skipping physical health creation - no meaningful data provided');
+      }
+
+      // Create medications only if they have valid data
       if (step3.currentMedications && step3.currentMedications.length > 0) {
-        await createMedications(user.id, step3.currentMedications.map(med => ({
-          ...med,
-          type: 'general'
-        })));
+        const validMedications = step3.currentMedications.filter(med =>
+          med.name?.trim()
+        );
+
+        if (validMedications.length > 0) {
+          console.log(`Creating ${validMedications.length} general medications...`);
+          await createMedications(user.id, validMedications.map(med => ({
+            ...med,
+            type: 'general'
+          })));
+          console.log('Medications created successfully');
+        } else {
+          console.log('Skipping medications - no valid medications provided');
+        }
       }
     }
 
-    // Create mental health data if step4 exists
+    // Create mental health data if step4 exists and has meaningful data
     if (step4) {
-      await createMentalHealth({
-        userId: user.id,
-        psychiatricConditions: step4.psychiatricConditions || undefined,
-        hasAnxietyAttacks: step4.hasAnxietyAttacks || false,
-        anxietyFrequency: step4.anxietyFrequency || undefined,
-        familyHistory: step4.familyHistory || undefined
-      });
+      const hasStep4Data = step4.psychiatricConditions || step4.hasAnxietyAttacks ||
+                          step4.anxietyFrequency || step4.familyHistory;
 
-      // Create psychiatric medications
+      if (hasStep4Data) {
+        console.log('Creating mental health record...');
+        await createMentalHealth({
+          userId: user.id,
+          psychiatricConditions: step4.psychiatricConditions || undefined,
+          hasAnxietyAttacks: step4.hasAnxietyAttacks || false,
+          anxietyFrequency: step4.anxietyFrequency || undefined,
+          familyHistory: step4.familyHistory || undefined
+        });
+        console.log('Mental health record created successfully');
+      } else {
+        console.log('Skipping mental health creation - no meaningful data provided');
+      }
+
+      // Create psychiatric medications only if they have valid data
       if (step4.psychiatricMedications && step4.psychiatricMedications.length > 0) {
-        await createMedications(user.id, step4.psychiatricMedications.map(med => ({
-          ...med,
-          type: 'psychiatric'
-        })));
+        const validPsychMedications = step4.psychiatricMedications.filter(med =>
+          med.name?.trim()
+        );
+
+        if (validPsychMedications.length > 0) {
+          console.log(`Creating ${validPsychMedications.length} psychiatric medications...`);
+          await createMedications(user.id, validPsychMedications.map(med => ({
+            ...med,
+            type: 'psychiatric'
+          })));
+          console.log('Psychiatric medications created successfully');
+        } else {
+          console.log('Skipping psychiatric medications - no valid medications provided');
+        }
       }
     }
 
     // Create harassment experiences if step5 exists
     if (step5 && step5.experiences && step5.experiences.length > 0) {
-      const validExperiences = step5.experiences.filter(exp => 
+      const validExperiences = step5.experiences.filter(exp =>
         exp.category && exp.description
       );
-      
+
       if (validExperiences.length > 0) {
-        await createHarassmentExperiences(user.id, validExperiences);
-        // Note: Evidence files would need to be handled separately
+        // Process evidence files for each experience
+        const experiencesWithFiles = await Promise.all(
+          validExperiences.map(async (exp) => {
+            let evidenceFiles: Array<{
+              fileUrl: string;
+              fileName: string;
+              fileType: string;
+              fileSize: number;
+            }> = [];
+
+            if (exp.evidence && exp.evidence.length > 0) {
+              // Filter for temp upload results
+              const tempEvidenceFiles = exp.evidence.filter(
+                (file): file is TempUploadResult =>
+                  typeof file === 'object' && 'tempId' in file
+              ) as TempUploadResult[];
+
+              if (tempEvidenceFiles.length > 0) {
+                const permanentEvidenceFiles = await moveTempFilesToUser(
+                  tempEvidenceFiles,
+                  user.id.toString()
+                );
+                evidenceFiles = permanentEvidenceFiles;
+              }
+            }
+
+            return {
+              ...exp,
+              evidenceFiles
+            };
+          })
+        );
+
+        await createHarassmentExperiences(user.id, experiencesWithFiles);
       }
     }
 

@@ -208,18 +208,29 @@ export async function createUserProfile(profileData: {
     occupation, hobbies, frequentPlaces, identityDocumentUrl, profilePhotoUrl
   } = profileData;
 
+  console.log('Creating user profile with data:', {
+    userId,
+    age,
+    gender,
+    hasIdentityDoc: !!identityDocumentUrl,
+    hasProfilePhoto: !!profilePhotoUrl
+  });
+
   const result = await sql`
     INSERT INTO user_profiles (
       user_id, age, gender, sexual_orientation, address, education_level,
       occupation, hobbies, frequent_places, identity_document_url, profile_photo_url
     )
     VALUES (
-      ${userId}, ${age}, ${gender}, ${sexualOrientation}, ${address}, ${educationLevel},
-      ${occupation}, ${hobbies}, ${frequentPlaces}, ${identityDocumentUrl}, ${profilePhotoUrl}
+      ${userId}, ${age || null}, ${gender || null}, ${sexualOrientation || null},
+      ${address || null}, ${educationLevel || null}, ${occupation || null},
+      ${hobbies || null}, ${frequentPlaces || null}, ${identityDocumentUrl || null},
+      ${profilePhotoUrl || null}
     )
     RETURNING id
   `;
 
+  console.log('User profile created with ID:', result.rows[0].id);
   return result.rows[0];
 }
 
@@ -263,18 +274,29 @@ export async function createPhysicalHealth(healthData: {
     chronicConditions, medicalAllergies, foodAllergies, environmentalAllergies
   } = healthData;
 
+  console.log('Creating physical health record with data:', {
+    userId,
+    weight,
+    height,
+    bloodType,
+    hasDisability
+  });
+
   const result = await sql`
     INSERT INTO physical_health (
       user_id, weight, height, blood_type, has_disability, disability_description,
       chronic_conditions, medical_allergies, food_allergies, environmental_allergies
     )
     VALUES (
-      ${userId}, ${weight}, ${height}, ${bloodType}, ${hasDisability}, ${disabilityDescription},
-      ${chronicConditions}, ${medicalAllergies}, ${foodAllergies}, ${environmentalAllergies}
+      ${userId}, ${weight || null}, ${height || null}, ${bloodType || null},
+      ${hasDisability || false}, ${disabilityDescription || null},
+      ${chronicConditions || null}, ${medicalAllergies || null},
+      ${foodAllergies || null}, ${environmentalAllergies || null}
     )
     RETURNING id
   `;
 
+  console.log('Physical health record created with ID:', result.rows[0].id);
   return result.rows[0];
 }
 
@@ -313,16 +335,25 @@ export async function createMentalHealth(mentalHealthData: {
     userId, psychiatricConditions, hasAnxietyAttacks, anxietyFrequency, familyHistory
   } = mentalHealthData;
 
+  console.log('Creating mental health record with data:', {
+    userId,
+    hasPsychConditions: !!psychiatricConditions,
+    hasAnxietyAttacks,
+    hasFamilyHistory: !!familyHistory
+  });
+
   const result = await sql`
     INSERT INTO mental_health (
       user_id, psychiatric_conditions, has_anxiety_attacks, anxiety_frequency, family_history
     )
     VALUES (
-      ${userId}, ${psychiatricConditions}, ${hasAnxietyAttacks}, ${anxietyFrequency}, ${familyHistory}
+      ${userId}, ${psychiatricConditions || null}, ${hasAnxietyAttacks || false},
+      ${anxietyFrequency || null}, ${familyHistory || null}
     )
     RETURNING id
   `;
 
+  console.log('Mental health record created with ID:', result.rows[0].id);
   return result.rows[0];
 }
 
@@ -333,6 +364,12 @@ export async function createHarassmentExperiences(userId: number, experiences: A
   date: string;
   description: string;
   reportedToAuthorities: boolean;
+  evidenceFiles?: Array<{
+    fileUrl: string;
+    fileName: string;
+    fileType: string;
+    fileSize: number;
+  }>;
 }>) {
   const results = [];
 
@@ -348,6 +385,19 @@ export async function createHarassmentExperiences(userId: number, experiences: A
         )
         RETURNING id
       `;
+
+      const experienceId = result.rows[0].id;
+
+      // Insert evidence files if provided
+      if (experience.evidenceFiles && experience.evidenceFiles.length > 0) {
+        for (const file of experience.evidenceFiles) {
+          await sql`
+            INSERT INTO evidence_files (experience_id, file_url, file_name, file_type, file_size)
+            VALUES (${experienceId}, ${file.fileUrl}, ${file.fileName}, ${file.fileType}, ${file.fileSize})
+          `;
+        }
+      }
+
       results.push(result.rows[0]);
     }
   }

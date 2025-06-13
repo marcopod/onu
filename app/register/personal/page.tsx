@@ -1,56 +1,93 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Plus, X } from "lucide-react"
+import { PersistentRegistrationProvider, usePersistentRegistration, usePersistentCurrentStepData, usePersistentUpdateStepData } from "@/components/auth/persistent-registration-context"
+import { RegistrationStep2Data } from "@/lib/types"
 
-export default function PersonalInfoPage() {
+function PersonalInfoPageContent() {
+  const stepData = usePersistentCurrentStepData<RegistrationStep2Data>('step2')
+  const updateStepData = usePersistentUpdateStepData()
+  const { isStepValid } = usePersistentRegistration()
+
   const [formData, setFormData] = useState({
-    age: "",
-    gender: "",
-    sexualOrientation: "",
-    address: "",
-    educationLevel: "",
-    occupation: "",
-    hobbies: "",
-    frequentPlaces: "",
-    emergencyContacts: [
+    age: stepData?.age || "",
+    gender: stepData?.gender || "",
+    sexualOrientation: stepData?.sexualOrientation || "",
+    address: stepData?.address || "",
+    educationLevel: stepData?.educationLevel || "",
+    occupation: stepData?.occupation || "",
+    hobbies: stepData?.hobbies || "",
+    frequentPlaces: stepData?.frequentPlaces || "",
+    emergencyContacts: stepData?.emergencyContacts || [
       { name: "", relationship: "", phone: "" }
     ]
   })
 
+  // Update form data when step data changes
+  useEffect(() => {
+    if (stepData) {
+      setFormData({
+        age: stepData.age || "",
+        gender: stepData.gender || "",
+        sexualOrientation: stepData.sexualOrientation || "",
+        address: stepData.address || "",
+        educationLevel: stepData.educationLevel || "",
+        occupation: stepData.occupation || "",
+        hobbies: stepData.hobbies || "",
+        frequentPlaces: stepData.frequentPlaces || "",
+        emergencyContacts: stepData.emergencyContacts || [
+          { name: "", relationship: "", phone: "" }
+        ]
+      })
+    }
+  }, [stepData])
+
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    const newFormData = { ...formData, [field]: value }
+    setFormData(newFormData)
+    updateStepData('step2', newFormData)
+    console.log('Updated step2 data:', newFormData)
   }
 
   const addEmergencyContact = () => {
-    setFormData(prev => ({
-      ...prev,
-      emergencyContacts: [...prev.emergencyContacts, { name: "", relationship: "", phone: "" }]
-    }))
+    const newFormData = {
+      ...formData,
+      emergencyContacts: [...formData.emergencyContacts, { name: "", relationship: "", phone: "" }]
+    }
+    setFormData(newFormData)
+    updateStepData('step2', newFormData)
+    console.log('Added emergency contact, updated step2 data:', newFormData)
   }
 
   const removeEmergencyContact = (index: number) => {
     if (formData.emergencyContacts.length > 1) {
-      setFormData(prev => ({
-        ...prev,
-        emergencyContacts: prev.emergencyContacts.filter((_, i) => i !== index)
-      }))
+      const newFormData = {
+        ...formData,
+        emergencyContacts: formData.emergencyContacts.filter((_, i) => i !== index)
+      }
+      setFormData(newFormData)
+      updateStepData('step2', newFormData)
+      console.log('Removed emergency contact, updated step2 data:', newFormData)
     }
   }
 
   const updateEmergencyContact = (index: number, field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      emergencyContacts: prev.emergencyContacts.map((contact, i) => 
+    const newFormData = {
+      ...formData,
+      emergencyContacts: formData.emergencyContacts.map((contact, i) =>
         i === index ? { ...contact, [field]: value } : contact
       )
-    }))
+    }
+    setFormData(newFormData)
+    updateStepData('step2', newFormData)
+    console.log('Updated emergency contact, updated step2 data:', newFormData)
   }
 
   const isFormValid = () => {
@@ -77,11 +114,11 @@ export default function PersonalInfoPage() {
 
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-green-600 font-medium">Paso 2 de 5</span>
+              <span className="text-sm text-green-600 font-medium">Paso 2 de 4</span>
               <span className="text-sm text-gray-500">Datos sociodemográficos</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-green-500 h-2 rounded-full w-2/5"></div>
+              <div className="bg-green-500 h-2 rounded-full w-2/4"></div>
             </div>
           </div>
 
@@ -266,11 +303,19 @@ export default function PersonalInfoPage() {
               ))}
             </div>
 
-            <Link href="/register/health-physical" className="block">
-              <Button 
+            <Link
+              href="/register/health-physical"
+              className="block"
+              onClick={() => {
+                // Explicitly save data before navigation
+                console.log('Saving step2 data before navigation:', formData);
+                updateStepData('step2', formData);
+              }}
+            >
+              <Button
                 className={`w-full rounded-full py-6 mt-8 ${
-                  isFormValid() 
-                    ? 'bg-green-500 hover:bg-green-600' 
+                  isFormValid()
+                    ? 'bg-green-500 hover:bg-green-600'
                     : 'bg-gray-300 cursor-not-allowed'
                 }`}
                 disabled={!isFormValid()}
@@ -282,5 +327,13 @@ export default function PersonalInfoPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function PersonalInfoPage() {
+  return (
+    <PersistentRegistrationProvider>
+      <PersonalInfoPageContent />
+    </PersistentRegistrationProvider>
   )
 }

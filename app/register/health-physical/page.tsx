@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,34 +9,67 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ArrowLeft, Plus, X } from "lucide-react"
+import { PersistentRegistrationProvider, usePersistentCurrentStepData, usePersistentUpdateStepData } from "@/components/auth/persistent-registration-context"
+import { RegistrationStep3Data } from "@/lib/types"
 
-export default function HealthPhysicalPage() {
+function HealthPhysicalPageContent() {
+  const stepData = usePersistentCurrentStepData<RegistrationStep3Data>('step3')
+  const updateStepData = usePersistentUpdateStepData()
+
   const [formData, setFormData] = useState({
-    weight: "",
-    height: "",
-    bloodType: "",
-    hasDisability: false,
-    disabilityDescription: "",
-    chronicConditions: "",
-    allergies: {
+    weight: stepData?.weight || "",
+    height: stepData?.height || "",
+    bloodType: stepData?.bloodType || "",
+    hasDisability: stepData?.hasDisability || false,
+    disabilityDescription: stepData?.disabilityDescription || "",
+    chronicConditions: stepData?.chronicConditions || "",
+    allergies: stepData?.allergies || {
       medical: "",
       food: "",
       environmental: ""
     },
-    currentMedications: [
+    currentMedications: stepData?.currentMedications || [
       { name: "", dose: "", frequency: "" }
     ]
   })
 
+  // Update form data when step data changes
+  useEffect(() => {
+    if (stepData) {
+      setFormData({
+        weight: stepData.weight || "",
+        height: stepData.height || "",
+        bloodType: stepData.bloodType || "",
+        hasDisability: stepData.hasDisability || false,
+        disabilityDescription: stepData.disabilityDescription || "",
+        chronicConditions: stepData.chronicConditions || "",
+        allergies: stepData.allergies || {
+          medical: "",
+          food: "",
+          environmental: ""
+        },
+        currentMedications: stepData.currentMedications || [
+          { name: "", dose: "", frequency: "" }
+        ]
+      })
+    }
+  }, [stepData])
+
   const handleInputChange = (field: string, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    const newFormData = { ...formData, [field]: value }
+    setFormData(newFormData)
+    updateStepData('step3', newFormData)
+    console.log('Updated step3 data:', newFormData)
   }
 
   const handleAllergyChange = (type: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      allergies: { ...prev.allergies, [type]: value }
-    }))
+    const newFormData = {
+      ...formData,
+      allergies: { ...formData.allergies, [type]: value }
+    }
+    setFormData(newFormData)
+    updateStepData('step3', newFormData)
+    console.log('Updated step3 allergies:', newFormData)
   }
 
   const addMedication = () => {
@@ -87,11 +120,11 @@ export default function HealthPhysicalPage() {
 
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-green-600 font-medium">Paso 3 de 5</span>
+              <span className="text-sm text-green-600 font-medium">Paso 3 de 4</span>
               <span className="text-sm text-gray-500">Información médica general</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-green-500 h-2 rounded-full w-3/5"></div>
+              <div className="bg-green-500 h-2 rounded-full w-3/4"></div>
             </div>
           </div>
 
@@ -295,7 +328,14 @@ export default function HealthPhysicalPage() {
               ))}
             </div>
 
-            <Link href="/register/health-mental" className="block">
+            <Link
+              href="/register/health-mental"
+              className="block"
+              onClick={() => {
+                console.log('Saving step3 data before navigation:', formData);
+                updateStepData('step3', formData);
+              }}
+            >
               <Button className="w-full bg-green-500 hover:bg-green-600 rounded-full py-6 mt-8">
                 Continuar
               </Button>
@@ -304,5 +344,13 @@ export default function HealthPhysicalPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function HealthPhysicalPage() {
+  return (
+    <PersistentRegistrationProvider>
+      <HealthPhysicalPageContent />
+    </PersistentRegistrationProvider>
   )
 }

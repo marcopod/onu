@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Shield, Home, MessageCircleWarning, Settings, MapPin, Users } from "lucide-react"
+import { Shield, Home, MessageCircleWarning, Settings, MapPin, Users, User, MessagesSquare } from "lucide-react"
 
 export default function HomePage() {
   return (
@@ -29,7 +29,7 @@ export default function HomePage() {
 
             <Link href="/chat" className="w-full">
               <Button variant="outline" className="w-full h-24 border-green-200 rounded-xl flex flex-col items-center justify-center gap-2 text-green-700 hover:bg-green-50">
-                <Users className="h-8 w-8" />
+                <MessagesSquare className="h-8 w-8" />
                 <span className="text-sm font-medium">Chat</span>
               </Button>
             </Link>
@@ -53,17 +53,15 @@ export default function HomePage() {
                 <Home className="h-6 w-6" />
                 <span className="sr-only">Home</span>
               </Link>
-              <Link href="/report" className="p-2 rounded-full text-white hover:bg-green-600">
-                <MessageCircleWarning className="h-6 w-6" />
-                <span className="sr-only">Report</span>
-              </Link>
+              
               <Link href="/location" className="p-2 rounded-full text-white hover:bg-green-600">
                 <MapPin className="h-6 w-6" />
                 <span className="sr-only">Location</span>
               </Link>
-              <Link href="/chat" className="p-2 rounded-full text-white hover:bg-green-600">
-                <Users className="h-6 w-6" />
-                <span className="sr-only">Chat</span>
+              
+              <Link href="/profile" className="p-2 rounded-full text-white hover:bg-green-600">
+                <User className="h-6 w-6" />
+                <span className="sr-only">Profile</span>
               </Link>
               <Link href="/settings" className="p-2 rounded-full text-white hover:bg-green-600">
                 <Settings className="h-6 w-6" />
