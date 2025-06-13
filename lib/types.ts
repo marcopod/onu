@@ -101,6 +101,72 @@ export interface UserSession {
   isActive: boolean;
 }
 
+// Harassment report types
+export interface HarassmentReport {
+  id: number;
+  reporterId: number;
+  reportedUserId?: number;
+  reportedUserName?: string;
+  category: string;
+  subcategory?: string;
+  description: string;
+  location?: string;
+  incidentDate?: string;
+  status: 'pending' | 'reviewed' | 'resolved' | 'dismissed';
+  isPublic: boolean;
+  createdAt: string;
+  updatedAt: string;
+  // Joined fields
+  reporterName?: string;
+  reporterEmail?: string;
+  reportedUserFullName?: string;
+  reportedUserEmail?: string;
+  evidenceFiles?: ReportEvidenceFile[];
+}
+
+export interface ReportEvidenceFile {
+  id: number;
+  reportId: number;
+  fileUrl: string;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: number;
+  createdAt: string;
+}
+
+export interface CreateReportData {
+  reportedUserId?: number;
+  reportedUserName?: string;
+  category: string;
+  subcategory?: string;
+  description: string;
+  location?: string;
+  incidentDate?: string;
+  isPublic?: boolean;
+  evidenceFiles?: Array<{
+    fileUrl: string;
+    fileName: string;
+    fileType: string;
+    fileSize: number;
+  }>;
+}
+
+export interface UserSearchResult {
+  id: number;
+  fullName: string;
+  email: string;
+}
+
+// File upload types
+export interface TempUploadResult {
+  tempId: string;
+  url: string;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  uploadType: string;
+}
+
 // Registration form types
 export interface RegistrationStep1Data {
   fullName: string;

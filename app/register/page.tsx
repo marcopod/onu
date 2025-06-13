@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Mail, Lock, Upload, User } from "lucide-react"
 import { PersistentRegistrationProvider, usePersistentRegistration, usePersistentCurrentStepData, usePersistentUpdateStepData } from "@/components/auth/persistent-registration-context"
+import { AuthRoute } from "@/components/auth/route-guard"
 import { RegistrationStep1Data } from "@/lib/types"
 
 function RegisterPageContent() {
@@ -291,8 +292,10 @@ function RegisterPageContent() {
 
 export default function RegisterPage() {
   return (
-    <PersistentRegistrationProvider>
-      <RegisterPageContent />
-    </PersistentRegistrationProvider>
+    <AuthRoute>
+      <PersistentRegistrationProvider>
+        <RegisterPageContent />
+      </PersistentRegistrationProvider>
+    </AuthRoute>
   )
 }

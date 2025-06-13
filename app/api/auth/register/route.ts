@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { registerUser, setAuthCookie } from '@/lib/auth';
-import { moveTempFilesToUser, TempUploadResult } from '@/lib/file-upload';
+import { moveTempFilesToUser, TempUploadResult } from '@/lib/file-utils';
 import { sql } from '@vercel/postgres';
 // Force use of real database for registration data
 let dbModule;

@@ -1,8 +1,11 @@
+"use client"
+
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Shield, Home, MessageCircleWarning, Settings, MapPin, Users, User, MessagesSquare } from "lucide-react"
+import { Shield, Home, ClipboardList, Flag, Settings, MapPin, User, MessagesSquare } from "lucide-react"
+import { ProtectedRoute } from "@/components/auth/route-guard"
 
-export default function HomePage() {
+function HomePageContent() {
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <main className="flex-1 flex flex-col items-center p-6 max-w-md mx-auto w-full">
@@ -22,7 +25,7 @@ export default function HomePage() {
           <div className="w-full grid grid-cols-2 gap-4">
             <Link href="/report" className="w-full">
               <Button variant="outline" className="w-full h-24 border-green-200 rounded-xl flex flex-col items-center justify-center gap-2 text-green-700 hover:bg-green-50">
-                <MessageCircleWarning className="h-8 w-8" />
+                <Flag className="h-8 w-8" />
                 <span className="text-sm font-medium">Reportar</span>
               </Button>
             </Link>
@@ -54,15 +57,21 @@ export default function HomePage() {
                 <span className="sr-only">Home</span>
               </Link>
               
+              <Link href="/reports" className="p-2 rounded-full text-white hover:bg-green-600">
+                <ClipboardList className="h-6 w-6" />
+                <span className="sr-only">Reports</span>
+              </Link>
+
               <Link href="/location" className="p-2 rounded-full text-white hover:bg-green-600">
                 <MapPin className="h-6 w-6" />
                 <span className="sr-only">Location</span>
               </Link>
-              
+
               <Link href="/profile" className="p-2 rounded-full text-white hover:bg-green-600">
                 <User className="h-6 w-6" />
                 <span className="sr-only">Profile</span>
               </Link>
+
               <Link href="/settings" className="p-2 rounded-full text-white hover:bg-green-600">
                 <Settings className="h-6 w-6" />
                 <span className="sr-only">Settings</span>
@@ -72,5 +81,13 @@ export default function HomePage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function HomePage() {
+  return (
+    <ProtectedRoute>
+      <HomePageContent />
+    </ProtectedRoute>
   )
 }

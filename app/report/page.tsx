@@ -1,13 +1,17 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Upload, MapPin, ChevronDown } from "lucide-react"
+import { ArrowLeft, Upload, MapPin, Search, User, X } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { useMultiFileUpload } from "@/hooks/use-file-upload"
+import { UserSearchResult, CreateReportData } from "@/lib/types"
+import { toast } from "sonner"
 
 const harassmentCategories = {
   "acoso-escolar": {
@@ -68,18 +72,68 @@ const harassmentCategories = {
 }
 
 export default function ReportPage() {
+  const router = useRouter()
   const [selectedCategory, setSelectedCategory] = useState("")
   const [selectedSubcategory, setSelectedSubcategory] = useState("")
+  const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null)
+  const [userSearchQuery, setUserSearchQuery] = useState("")
+  const [userSearchResults, setUserSearchResults] = useState<UserSearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     location: "",
     description: "",
-    evidence: [] as File[]
+    incidentDate: "",
+    isPublic: false
   })
 
-  const handleFileUpload = (files: FileList | null) => {
+  const { uploadedFiles, uploadFiles, removeFile, clearFiles, isUploading, error: uploadError } = useMultiFileUpload()
+
+  // Search for users
+  const searchUsers = async (query: string) => {
+    if (query.length < 2) {
+      setUserSearchResults([])
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`, {
+        credentials: 'include'
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        setUserSearchResults(data.data.users)
+      } else {
+        console.error('User search failed:', data.error)
+        setUserSearchResults([])
+      }
+    } catch (error) {
+      console.error('User search error:', error)
+      setUserSearchResults([])
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  // Handle user search input
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (userSearchQuery) {
+        searchUsers(userSearchQuery)
+      } else {
+        setUserSearchResults([])
+      }
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [userSearchQuery])
+
+  const handleFileUpload = async (files: FileList | null) => {
     if (files) {
       const fileArray = Array.from(files)
-      setFormData(prev => ({ ...prev, evidence: fileArray }))
+      await uploadFiles(fileArray, 'evidence')
     }
   }
 
@@ -96,6 +150,59 @@ export default function ReportPage() {
            formData.description.length >= 50
   }
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!isFormValid()) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      const reportData: CreateReportData = {
+        reportedUserId: selectedUser?.id,
+        reportedUserName: selectedUser?.fullName,
+        category: selectedCategory,
+        subcategory: selectedSubcategory,
+        description: formData.description,
+        location: formData.location,
+        incidentDate: formData.incidentDate,
+        isPublic: formData.isPublic,
+        evidenceFiles: uploadedFiles.map(file => ({
+          fileUrl: file.url,
+          fileName: file.fileName,
+          fileType: file.fileType,
+          fileSize: file.fileSize
+        }))
+      }
+
+      const response = await fetch('/api/reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(reportData)
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success('Report submitted successfully')
+        router.push('/reports')
+      } else {
+        toast.error(data.error || 'Failed to submit report')
+      }
+    } catch (error) {
+      console.error('Submit error:', error)
+      toast.error('Failed to submit report')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <main className="flex-1 flex flex-col p-6 max-w-md mx-auto w-full">
@@ -107,11 +214,11 @@ export default function ReportPage() {
             <h1 className="text-2xl font-bold text-green-800 ml-4">Reportar Incidente</h1>
           </div>
 
-          <form className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* User Selection */}
+            
+
             <div className="space-y-4">
-              <Label className="text-green-800 font-medium">
-                Clasificación del acoso *
-              </Label>
 
               <div className="space-y-3">
                 <div className="space-y-2">
@@ -205,20 +312,70 @@ export default function ReportPage() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="incidentDate" className="text-green-800 font-medium">
+                Fecha del incidente
+              </Label>
+              <Input
+                id="incidentDate"
+                type="date"
+                className="border-green-200 rounded-xl"
+                value={formData.incidentDate}
+                onChange={(e) => setFormData(prev => ({ ...prev, incidentDate: e.target.value }))}
+              />
+              <p className="text-xs text-gray-500">
+                Opcional: Ayuda a establecer un contexto temporal del incidente
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-green-800 font-medium">
+                Visibilidad del reporte
+              </Label>
+              <div className="space-y-3">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="visibility"
+                    checked={!formData.isPublic}
+                    onChange={() => setFormData(prev => ({ ...prev, isPublic: false }))}
+                    className="text-green-600"
+                  />
+                  <span className="text-sm">Privado (solo yo y administradores pueden verlo)</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="visibility"
+                    checked={formData.isPublic}
+                    onChange={() => setFormData(prev => ({ ...prev, isPublic: true }))}
+                    className="text-green-600"
+                  />
+                  <span className="text-sm">Público (otros usuarios pueden ver este reporte)</span>
+                </label>
+              </div>
+              <p className="text-xs text-gray-500">
+                Los reportes públicos ayudan a la comunidad a identificar patrones de acoso
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label className="text-green-800 font-medium">Evidencia (Opcional)</Label>
               <p className="text-sm text-gray-600">
-                Fotos, audio, documentos (JPG, PNG, PDF, MP3 - máximo 20MB total)
+                Fotos, audio, documentos (JPG, PNG, PDF, MP3 - máximo 20MB por archivo)
               </p>
               <Button
                 type="button"
                 variant="outline"
                 className="w-full border-dashed border-2 border-green-200 h-20 flex flex-col items-center justify-center gap-1 rounded-xl"
                 onClick={() => document.getElementById('evidence')?.click()}
+                disabled={isUploading}
               >
                 <Upload className="h-5 w-5 text-green-500" />
                 <span className="text-sm text-gray-500">
-                  {formData.evidence.length > 0
-                    ? `${formData.evidence.length} archivo(s) seleccionado(s)`
+                  {isUploading
+                    ? "Subiendo archivos..."
+                    : uploadedFiles.length > 0
+                    ? `${uploadedFiles.length} archivo(s) subido(s)`
                     : "Subir foto, audio o documento"
                   }
                 </span>
@@ -232,11 +389,24 @@ export default function ReportPage() {
                 onChange={(e) => handleFileUpload(e.target.files)}
               />
 
-              {formData.evidence.length > 0 && (
+              {uploadError && (
+                <p className="text-sm text-red-500">{uploadError}</p>
+              )}
+
+              {uploadedFiles.length > 0 && (
                 <div className="space-y-1">
-                  {formData.evidence.map((file, index) => (
-                    <div key={index} className="text-xs text-gray-600 bg-gray-50 p-2 rounded border">
-                      {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 p-2 rounded border">
+                      <span>{file.fileName} ({(file.fileSize / 1024 / 1024).toFixed(2)} MB)</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(file.tempId)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -261,14 +431,15 @@ export default function ReportPage() {
             </div>
 
             <Button
+              type="submit"
               className={`w-full rounded-full py-6 ${
-                isFormValid()
+                isFormValid() && !isSubmitting
                   ? 'bg-green-500 hover:bg-green-600'
                   : 'bg-gray-300 cursor-not-allowed'
               }`}
-              disabled={!isFormValid()}
+              disabled={!isFormValid() || isSubmitting || isUploading}
             >
-              Enviar Reporte
+              {isSubmitting ? 'Enviando...' : 'Enviar Reporte'}
             </Button>
           </form>
         </div>

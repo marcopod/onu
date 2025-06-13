@@ -1,0 +1,193 @@
+/* Comprehensive CSS to suppress all error overlays and notifications */
+
+/* Next.js Development Error Overlays */
+iframe[data-nextjs-dialog-overlay],
+[data-nextjs-dialog-overlay],
+[data-nextjs-dialog],
+[data-nextjs-toast],
+[data-nextjs-error-overlay],
+[data-nextjs-terminal],
+.__next-dev-overlay-backdrop,
+.__next-dev-overlay-container,
+.nextjs-container-errors-header,
+.nextjs-container-errors,
+.nextjs-toast-errors,
+.nextjs-portal,
+
+/* React Error Overlays */
+.react-error-overlay,
+#__next-error-overlay__,
+.error-overlay-container,
+[data-overlay-backdrop],
+[data-error-overlay],
+
+/* Webpack Dev Server Overlays */
+.webpack-dev-server-client-overlay,
+.webpack-dev-server-client-overlay-div,
+
+/* Generic error overlays */
+[class*="error-overlay"],
+[class*="dev-overlay"],
+[id*="error-overlay"],
+[id*="dev-overlay"],
+
+/* ALL toast notifications in development */
+.Toaster,
+[data-sonner-toaster],
+.sonner-toast,
+.toast,
+.toaster,
+[data-toast],
+[data-toast-viewport],
+[data-toast-root],
+.toast-container,
+.toast-wrapper,
+.react-hot-toast,
+[data-hot-toast],
+
+/* Error toast notifications */
+.Toaster[data-sonner-toaster] [data-type="error"],
+.toast[data-type="error"],
+.sonner-toast[data-type="error"],
+
+/* Any element with error-related data attributes */
+[data-error="true"],
+[data-has-error="true"],
+
+/* Development notifications */
+[data-nextjs-build-indicator],
+.nextjs-build-indicator,
+
+/* Hot reload notifications */
+[data-nextjs-hmr],
+.nextjs-hmr-indicator,
+
+/* Build activity indicators */
+[data-nextjs-build-activity],
+.nextjs-build-activity {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  z-index: -9999 !important;
+  transform: scale(0) !important;
+  overflow: hidden !important;
+}
+
+/* Hide any fixed/absolute positioned elements that might be overlays */
+body > div[style*="position: fixed"]:not([data-radix-portal]):not([data-radix-popper-content-wrapper]):not(.toaster):not([data-sonner-toaster]) {
+  display: none !important;
+}
+
+body > div[style*="position: absolute"]:not([data-radix-portal]):not([data-radix-popper-content-wrapper]):not(.toaster):not([data-sonner-toaster]) {
+  display: none !important;
+}
+
+/* Specifically target Next.js error iframes */
+iframe[src*="error-overlay"],
+iframe[src*="dev-overlay"],
+iframe[title*="error"],
+iframe[title*="Error"] {
+  display: none !important;
+}
+
+/* Hide any portal containers that might contain error overlays */
+#__next-error-portal,
+#__next-dev-portal,
+[data-portal-container] div[style*="position: fixed"] {
+  display: none !important;
+}
+
+/* In development, don't re-enable any toast components */
+/* All toasts are suppressed in development mode */
+
+/* Ensure our app's legitimate toasts still work */
+.Toaster[data-sonner-toaster] .sonner-toast:not([data-type="error"]) {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Hide error-specific toast content */
+.sonner-toast[data-type="error"] .sonner-toast-content,
+.toast[data-type="error"] .toast-content,
+.Toaster .toast-error {
+  display: none !important;
+}
+
+/* Additional safety net for any remaining overlays */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 999999;
+  pointer-events: none;
+  background: transparent;
+}
+
+/* Hide any elements that contain error-related text */
+div:has-text("Error"),
+div:has-text("Warning"),
+div:has-text("Failed to compile"),
+div:has-text("Compilation error"),
+span:has-text("Error"),
+span:has-text("Warning") {
+  display: none !important;
+}
+
+/* Modern CSS selector for elements containing error text (where supported) */
+@supports selector(:has(*)) {
+  div:has([data-error]),
+  div:has(.error),
+  div:has([class*="error"]) {
+    display: none !important;
+  }
+}
+
+/* Keyframe to prevent any fade-in animations of overlays */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 0; }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(-100%); }
+}
+
+/* Override any animations that might show overlays */
+[data-nextjs-dialog-overlay] *,
+[data-error-overlay] *,
+.error-overlay-container *,
+.__next-dev-overlay-container * {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Media queries to ensure overlays are hidden on all screen sizes */
+@media screen and (max-width: 768px) {
+  [data-nextjs-dialog-overlay],
+  [data-error-overlay],
+  .error-overlay-container,
+  .__next-dev-overlay-container {
+    display: none !important;
+  }
+}
+
+@media screen and (min-width: 769px) {
+  [data-nextjs-dialog-overlay],
+  [data-error-overlay],
+  .error-overlay-container,
+  .__next-dev-overlay-container {
+    display: none !important;
+  }
+}

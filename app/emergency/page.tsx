@@ -4,8 +4,9 @@ import Link from "next/link"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Phone, AlertTriangle, Shield, Users, MapPin, Clock } from "lucide-react"
+import { ProtectedRoute } from "@/components/auth/route-guard"
 
-export default function EmergencyPage() {
+function EmergencyPageContent() {
   const [isEmergencyActive, setIsEmergencyActive] = useState(false)
   const [countdown, setCountdown] = useState(0)
   const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null)
@@ -242,5 +243,13 @@ export default function EmergencyPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function EmergencyPage() {
+  return (
+    <ProtectedRoute>
+      <EmergencyPageContent />
+    </ProtectedRoute>
   )
 }

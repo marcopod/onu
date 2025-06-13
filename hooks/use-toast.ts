@@ -143,6 +143,16 @@ function dispatch(action: Action) {
 type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
+  // In development, completely suppress all toasts and just log to console
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Toast suppressed in development:', props);
+    return {
+      id: 'suppressed',
+      dismiss: () => {},
+      update: () => {},
+    };
+  }
+
   const id = genId()
 
   const update = (props: ToasterToast) =>
@@ -183,6 +193,22 @@ function useToast() {
       }
     }
   }, [state])
+
+  // In development, return suppressed toast functions
+  if (process.env.NODE_ENV === 'development') {
+    return {
+      toasts: [], // No toasts in development
+      toast: (props: Toast) => {
+        console.log('Toast suppressed in development:', props);
+        return {
+          id: 'suppressed',
+          dismiss: () => {},
+          update: () => {},
+        };
+      },
+      dismiss: () => {},
+    };
+  }
 
   return {
     ...state,

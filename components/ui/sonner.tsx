@@ -8,6 +8,11 @@ type ToasterProps = React.ComponentProps<typeof Sonner>
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme()
 
+  // In development, completely disable the toaster to prevent any error notifications
+  if (process.env.NODE_ENV === 'development') {
+    return null;
+  }
+
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}

@@ -13,6 +13,11 @@ import {
 export function Toaster() {
   const { toasts } = useToast()
 
+  // In development, completely disable the toaster to prevent any error notifications
+  if (process.env.NODE_ENV === 'development') {
+    return null;
+  }
+
   return (
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {

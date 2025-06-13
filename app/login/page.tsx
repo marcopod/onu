@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-context"
+import { AuthRoute } from "@/components/auth/route-guard"
 import { toast } from "sonner"
 
 function LoginForm() {
@@ -150,12 +151,14 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-500"></div>
-      </div>
-    }>
-      <LoginForm />
-    </Suspense>
+    <AuthRoute>
+      <Suspense fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-500"></div>
+        </div>
+      }>
+        <LoginForm />
+      </Suspense>
+    </AuthRoute>
   )
 }

@@ -137,6 +137,38 @@ export async function initializeDatabase() {
       )
     `;
 
+    // Harassment reports table (separate from harassment_experiences)
+    await sql`
+      CREATE TABLE IF NOT EXISTS harassment_reports (
+        id SERIAL PRIMARY KEY,
+        reporter_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        reported_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        reported_user_name VARCHAR(255),
+        category VARCHAR(100) NOT NULL,
+        subcategory VARCHAR(100),
+        description TEXT NOT NULL,
+        location TEXT,
+        incident_date DATE,
+        status VARCHAR(50) DEFAULT 'pending',
+        is_public BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    // Report evidence files table
+    await sql`
+      CREATE TABLE IF NOT EXISTS report_evidence_files (
+        id SERIAL PRIMARY KEY,
+        report_id INTEGER REFERENCES harassment_reports(id) ON DELETE CASCADE,
+        file_url VARCHAR(500) NOT NULL,
+        file_name VARCHAR(255),
+        file_type VARCHAR(100),
+        file_size INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
     console.log('Database tables initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
@@ -403,6 +435,162 @@ export async function createHarassmentExperiences(userId: number, experiences: A
   }
 
   return results;
+}
+
+// Harassment reports functions
+export async function createHarassmentReport(reportData: {
+  reporterId: number;
+  reportedUserId?: number;
+  reportedUserName?: string;
+  category: string;
+  subcategory?: string;
+  description: string;
+  location?: string;
+  incidentDate?: string;
+  isPublic?: boolean;
+  evidenceFiles?: Array<{
+    fileUrl: string;
+    fileName: string;
+    fileType: string;
+    fileSize: number;
+  }>;
+}) {
+  const {
+    reporterId,
+    reportedUserId,
+    reportedUserName,
+    category,
+    subcategory,
+    description,
+    location,
+    incidentDate,
+    isPublic = false,
+    evidenceFiles
+  } = reportData;
+
+  const result = await sql`
+    INSERT INTO harassment_reports (
+      reporter_id, reported_user_id, reported_user_name, category, subcategory,
+      description, location, incident_date, is_public
+    )
+    VALUES (
+      ${reporterId}, ${reportedUserId || null}, ${reportedUserName || null},
+      ${category}, ${subcategory || null}, ${description}, ${location || null},
+      ${incidentDate || null}, ${isPublic}
+    )
+    RETURNING id, created_at
+  `;
+
+  const reportId = result.rows[0].id;
+
+  // Insert evidence files if provided
+  if (evidenceFiles && evidenceFiles.length > 0) {
+    for (const file of evidenceFiles) {
+      await sql`
+        INSERT INTO report_evidence_files (report_id, file_url, file_name, file_type, file_size)
+        VALUES (${reportId}, ${file.fileUrl}, ${file.fileName}, ${file.fileType}, ${file.fileSize})
+      `;
+    }
+  }
+
+  return result.rows[0];
+}
+
+export async function getHarassmentReports(userId: number, isAdmin: boolean = false) {
+  if (isAdmin) {
+    // Admin can see all reports
+    const result = await sql`
+      SELECT
+        hr.*,
+        u1.full_name as reporter_name,
+        u1.email as reporter_email,
+        u2.full_name as reported_user_full_name,
+        u2.email as reported_user_email
+      FROM harassment_reports hr
+      LEFT JOIN users u1 ON hr.reporter_id = u1.id
+      LEFT JOIN users u2 ON hr.reported_user_id = u2.id
+      ORDER BY hr.created_at DESC
+    `;
+    return result.rows;
+  } else {
+    // Regular users can only see their own reports and public reports
+    const result = await sql`
+      SELECT
+        hr.*,
+        u1.full_name as reporter_name,
+        u2.full_name as reported_user_full_name
+      FROM harassment_reports hr
+      LEFT JOIN users u1 ON hr.reporter_id = u1.id
+      LEFT JOIN users u2 ON hr.reported_user_id = u2.id
+      WHERE hr.reporter_id = ${userId} OR hr.is_public = true
+      ORDER BY hr.created_at DESC
+    `;
+    return result.rows;
+  }
+}
+
+export async function getHarassmentReportById(reportId: number, userId: number, isAdmin: boolean = false) {
+  const result = await sql`
+    SELECT
+      hr.*,
+      u1.full_name as reporter_name,
+      u1.email as reporter_email,
+      u2.full_name as reported_user_full_name,
+      u2.email as reported_user_email
+    FROM harassment_reports hr
+    LEFT JOIN users u1 ON hr.reporter_id = u1.id
+    LEFT JOIN users u2 ON hr.reported_user_id = u2.id
+    WHERE hr.id = ${reportId}
+  `;
+
+  const report = result.rows[0];
+  if (!report) return null;
+
+  // Check permissions
+  if (!isAdmin && report.reporter_id !== userId && !report.is_public) {
+    return null; // User doesn't have permission to view this report
+  }
+
+  // Get evidence files
+  const evidenceResult = await sql`
+    SELECT * FROM report_evidence_files
+    WHERE report_id = ${reportId}
+    ORDER BY created_at ASC
+  `;
+
+  return {
+    ...report,
+    evidenceFiles: evidenceResult.rows
+  };
+}
+
+export async function updateHarassmentReportStatus(reportId: number, status: string, userId: number, isAdmin: boolean = false) {
+  if (!isAdmin) {
+    throw new Error('Only administrators can update report status');
+  }
+
+  const result = await sql`
+    UPDATE harassment_reports
+    SET status = ${status}, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${reportId}
+    RETURNING id, status, updated_at
+  `;
+
+  return result.rows[0];
+}
+
+export async function searchUsers(query: string, currentUserId: number) {
+  const result = await sql`
+    SELECT id, full_name, email
+    FROM users
+    WHERE (full_name ILIKE ${'%' + query + '%'} OR email ILIKE ${'%' + query + '%'})
+    AND id != ${currentUserId}
+    AND is_verified = true
+    ORDER BY full_name
+    LIMIT 10
+  `;
+
+  return result.rows;
 }
 
 // Session management functions

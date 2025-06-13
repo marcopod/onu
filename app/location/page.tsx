@@ -5,7 +5,8 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, MapPin, Navigation, Clock, Calendar, Filter, Home, MessageCircleWarning, Settings } from "lucide-react"
+import { ArrowLeft, MapPin, Navigation, Clock, Calendar, Filter, Home, MessageCircleWarning, Settings, User, ClipboardList } from "lucide-react"
+import { ProtectedRoute } from "@/components/auth/route-guard"
 
 interface LocationEntry {
   id: string
@@ -16,7 +17,7 @@ interface LocationEntry {
   accuracy: number
 }
 
-export default function LocationPage() {
+function LocationPageContent() {
   const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null)
   const [locationHistory, setLocationHistory] = useState<LocationEntry[]>([
     {
@@ -206,7 +207,7 @@ export default function LocationPage() {
           </div>
 
           {/* Información adicional */}
-          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
             <h3 className="font-medium text-blue-800 mb-2">Información de privacidad</h3>
             <p className="text-sm text-blue-700">
               Tu ubicación se almacena de forma segura y solo se comparte con contactos de emergencia cuando actives una alerta. 
@@ -215,21 +216,29 @@ export default function LocationPage() {
           </div>
 
           {/* Navegación inferior */}
-          <div className="mt-8 w-full">
+          <div className="mt-auto w-full">
             <nav className="flex items-center justify-between bg-green-500 rounded-full p-2">
-              <Link href="/" className="p-2 rounded-full text-white">
+              <Link href="/" className="p-2 rounded-full bg-white text-green-500">
                 <Home className="h-6 w-6" />
                 <span className="sr-only">Home</span>
               </Link>
-              <Link href="/report" className="p-2 rounded-full text-white">
-                <MessageCircleWarning className="h-6 w-6" />
-                <span className="sr-only">Report</span>
+              
+              <Link href="/reports" className="p-2 rounded-full text-white hover:bg-green-600">
+                <ClipboardList className="h-6 w-6" />
+                <span className="sr-only">Reports</span>
               </Link>
-              <Link href="/location" className="p-2 rounded-full bg-white text-green-500">
+
+              <Link href="/location" className="p-2 rounded-full text-white hover:bg-green-600">
                 <MapPin className="h-6 w-6" />
                 <span className="sr-only">Location</span>
               </Link>
-              <Link href="/settings" className="p-2 rounded-full text-white">
+
+              <Link href="/profile" className="p-2 rounded-full text-white hover:bg-green-600">
+                <User className="h-6 w-6" />
+                <span className="sr-only">Profile</span>
+              </Link>
+
+              <Link href="/settings" className="p-2 rounded-full text-white hover:bg-green-600">
                 <Settings className="h-6 w-6" />
                 <span className="sr-only">Settings</span>
               </Link>
@@ -238,5 +247,13 @@ export default function LocationPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function LocationPage() {
+  return (
+    <ProtectedRoute>
+      <LocationPageContent />
+    </ProtectedRoute>
   )
 }

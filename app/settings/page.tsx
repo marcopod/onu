@@ -8,9 +8,13 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Share2, Key, Bell, MapPin, Globe, HelpCircle, MessageSquare, Shield, Copy, Check } from "lucide-react"
+import { ArrowLeft, Share2, Key, Bell, MapPin, Globe, HelpCircle, MessageSquare, Shield, Copy, Check, LogOut } from "lucide-react"
+import { ProtectedRoute } from "@/components/auth/route-guard"
+import { useAuth } from "@/components/auth/auth-context"
+import { toast } from "sonner"
 
-export default function SettingsPage() {
+function SettingsPageContent() {
+  const { logout } = useAuth()
   const [settings, setSettings] = useState({
     notifications: true,
     locationTracking: true,
@@ -42,6 +46,15 @@ export default function SettingsPage() {
       console.log("Conectando con código:", settings.connectCode)
       alert(`Intentando conectar con el código: ${settings.connectCode}`)
       setSettings(prev => ({ ...prev, connectCode: "" }))
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      toast.success("Sesión cerrada exitosamente")
+    } catch (error) {
+      toast.error("Error al cerrar sesión")
     }
   }
 
@@ -260,6 +273,18 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            {/* Cerrar sesión */}
+            <div className="space-y-4">
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                className="w-full border-red-200 text-red-600 hover:bg-red-50 rounded-xl py-4"
+              >
+                <LogOut className="h-5 w-5 mr-2" />
+                Cerrar Sesión
+              </Button>
+            </div>
+
             {/* Información de la app */}
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
               <h3 className="font-medium text-gray-800 mb-2">Help me! v1.0.0</h3>
@@ -272,5 +297,13 @@ export default function SettingsPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function SettingsPage() {
+  return (
+    <ProtectedRoute>
+      <SettingsPageContent />
+    </ProtectedRoute>
   )
 }

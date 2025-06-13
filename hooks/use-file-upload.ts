@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { uploadTempFile, TempUploadResult } from '@/lib/file-upload';
+import { uploadTempFile } from '@/lib/file-upload';
+import { TempUploadResult } from '@/lib/types';
 
 export interface FileUploadState {
   isUploading: boolean;
